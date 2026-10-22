@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    # The host resolver injects a search domain (tailnet) that Docker's
+    # embedded DNS cannot answer, which breaks service name resolution.
+    # ndots:0 makes the resolver query the name as-is first.
+    dns_opt:
+      - ndots:0
+    dns_search:
+      - .
+    environment:
+      POSTGRES_USER: helpdesk
+      POSTGRES_PASSWORD: helpdesk
+      POSTGRES_DB: helpdesk
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helpdesk -d helpdesk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    dns_opt:
+      - ndots:0
+    dns_search:
+      - .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: development
+      SERVER_PORT: "8080"
+      DATABASE_URL: postgres://helpdesk:helpdesk@postgres:5432/helpdesk?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-0123456789abcdef}
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-data:
